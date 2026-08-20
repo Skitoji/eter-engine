@@ -33,10 +33,14 @@ class FaithSystem:
 
         # 3. Quiebre de la fe y pérdida de hegemonía de la Santa Iglesia
         if region.fervor.valor < cls.UMBRAL_CRITICO_FE and region.faccion_dominante == FaccionTipo.SANTA_IGLESIA:
+            faccion_anterior = region.faccion_dominante
+            # La hegemonía se rompe: la facción dominante deja de ser la Santa Iglesia
+            # y pasa a manos de los cultistas. Esto evita re-emitir el evento cada tick.
+            region.faccion_dominante = FaccionTipo.FACCIÓN_CULTISTA_OSCURA
             EventBus.publicar(
                 HegemoniaIglesiaRotasEvent(
                     region_id=region_id,
                     nombre_region=region.nombre,
-                    faccion_anterior=region.faccion_dominante
+                    faccion_anterior=faccion_anterior
                 )
             )
