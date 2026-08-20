@@ -4,7 +4,10 @@ from eter_core.domain.types import EntityID
 from eter_core.components.region_component import RegiónComponent
 from eter_core.systems.faith_system import FaithSystem
 from eter_core.components.economy_component import EconomyComponent
+from eter_core.components.enemy_component import EnemyComponent
 from eter_core.systems.economic_system import EconomicSystem
+from eter_core.systems.infection_system import InfectionSystem
+from eter_core.systems.cultist_system import CultistSystem
 
 class EterEngine:
     def __init__(self):
@@ -29,16 +32,31 @@ class EterEngine:
 
     def tick(self, delta_tiempo: float = 1.0) -> None:
         """El latido del mundo. Avanza el tiempo según los turnos del jugador."""
-        # 1. Ejecutar el Sistema de Fe
-        # Busca todas las entidades en el mundo que tengan el componente "Región"
+        # 1. Sistema de Fe: degrada el fervor y calcula la tasa de magos oscuros
         if RegiónComponent in self.componentes:
             for entity_id, region_comp in self.componentes[RegiónComponent].items():
-                # El sistema procesa los datos y los muta según las reglas matemáticas
                 FaithSystem.evaluar_region(entity_id, region_comp, delta_tiempo)
+
+        # 2. Sistema de Infección: propaga la plaga entre provincias adyacentes
+        if RegiónComponent in self.componentes:
+            InfectionSystem.expandir(
+                self.componentes[RegiónComponent],
+                self.adyacencias,
+                delta_tiempo,
+            )
+
+        # 3. Sistema Económico: genera riqueza por turno
         if RegiónComponent in self.componentes and EconomyComponent in self.componentes:
             EconomicSystem.procesar(
                 self.componentes[RegiónComponent],
                 self.componentes[EconomyComponent],
                 delta_tiempo,
             )
-        # InfectionSystem.expandir(...)
+
+        # 4. Sistema de Cultistas: materializa la tasa de magos oscuros en enemigos
+        if RegiónComponent in self.componentes and EnemyComponent in self.componentes:
+            CultistSystem.procesar(
+                self.componentes[RegiónComponent],
+                self.componentes[EnemyComponent],
+                delta_tiempo,
+            )

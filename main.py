@@ -7,6 +7,7 @@ from typing import Dict, Optional, Tuple
 sys.path.insert(0, os.path.abspath("src"))
 
 from eter_core.components.economy_component import EconomyComponent
+from eter_core.components.enemy_component import EnemyComponent
 from eter_core.components.player_component import PlayerComponent
 from eter_core.components.region_component import RegiónComponent, StateComponent, TerritoryComponent
 from eter_core.components.trade_component import TradeComponent
@@ -70,6 +71,7 @@ def cargar_mundo() -> Tuple[EterEngine, Dict[int, int], Dict[int, int], float]:
         market = EconomicSystem.crear_mercado(data.biome, data.coordinates, data.has_city)
         market.nombre_completo = data.full_name
         engine.agregar_componente(entity_id, market)
+        engine.agregar_componente(entity_id, EnemyComponent())
         province_names[data.name.casefold()] = entity_id
         province_names[f"{data.name} {province_id}".casefold()] = entity_id
         province_state_names[province_id] = state_name
@@ -273,7 +275,6 @@ def iniciar_simulacion() -> None:
                 continue
             economy = engine.componentes[EconomyComponent][entity_id]
             fondos_jugador -= EconomicSystem.COSTE_INVERSION
-            economy.oro += EconomicSystem.COSTE_INVERSION
             EconomicSystem.invertir(engine.componentes[RegiónComponent][entity_id], economy, entity_id)
             print("Inversion realizada.")
             continue

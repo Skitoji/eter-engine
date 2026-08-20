@@ -51,3 +51,11 @@ class ComercioRealizadoEvent(DomainEvent):
     distancia: float = 0.0
     dias_transporte: int = 0
     precio: float = 0.0
+
+
+@dataclass(frozen=True)
+class CultistasSurgidosEvent(DomainEvent):
+    """Se emite cuando un cultista/mago oscuro surge en una región."""
+    region_id: EntityID
+    nombre_region: str
+    total_cultistas: int

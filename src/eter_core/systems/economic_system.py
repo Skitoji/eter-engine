@@ -104,9 +104,8 @@ class EconomicSystem:
 
     @classmethod
     def invertir(cls, region: RegiónComponent, economy: EconomyComponent, entity_id: EntityID) -> bool:
-        if economy.oro < cls.COSTE_INVERSION:
-            return False
-        economy.oro -= cls.COSTE_INVERSION
+        # La inversión la financia el jugador (en main.py se descuenta de fondos_jugador),
+        # por lo que aquí NO se toca economy.oro: solo se aplican los efectos de desarrollo.
         region.infeccion = NivelInfeccion(max(0.0, region.infeccion.valor - 0.10))
         region.fervor = FervorReligioso(min(1.0, region.fervor.valor + 0.05))
         economy.nivel_desarrollo += 1
@@ -153,8 +152,11 @@ class EconomicSystem:
             raise ValueError("No hay oferta disponible para ese producto.")
         mercados[origen_id].oferta[producto] -= 1.0
         mercados[destino_id].demanda[producto] = max(0.0, mercados[destino_id].demanda.get(producto, 0.0) - 1.0)
-        economias[origen_id].oro += price
-        economias[destino_id].oro = max(0.0, economias[destino_id].oro - price * 0.05)
+        # Transferencia simétrica de riqueza: el vendedor gana el precio y el comprador
+        # paga exactamente ese precio (limitado a su oro disponible para no quedar negativo).
+        pago = min(price, economias[destino_id].oro)
+        economias[origen_id].oro += pago
+        economias[destino_id].oro -= pago
         economias[origen_id].comercio_activo = True
         economias[destino_id].comercio_activo = True
         EventBus.publicar(ComercioRealizadoEvent(origen_id, destino_id, price, producto, distance, days, price))
