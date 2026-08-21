@@ -80,11 +80,68 @@ La separación entre `eter_core`, `eter_infrastructure` y el bus de eventos perm
 
 ## 4. Estado Actual del Desarrollo (Fase 1)
 Se ha configurado el núcleo del motor (`eter-engine`) en Python con tipado estricto, estructurado en las siguientes capas:
-1.  **Dominio (`eter_core/domain`):** Tipos inmutables y eventos del mundo.
-2.  **Componentes (`eter_core/components`):** Datos regionales (población, facción, fe, infección).
-3.  **Sistemas (`eter_core/systems`):** Se ha completado el `FaithSystem`, que vincula mecánicamente el fervor eclesiástico con el surgimiento de magos oscuros.
-4.  **Infraestructura (`eter_infrastructure`):** Se ha desarrollado el `EventBus` para la comunicación asíncrona entre mecánicas.
+1.  **Dominio (`eter_core/domain`):** Tipos inmutables, eventos del mundo y catálogos de datos (arquetipos, productos, monstruos, objetos, recetas).
+2.  **Componentes (`eter_core/components`):** Datos regionales (población, facción, fe, infección), economía, comercio, enemigos y estado del jugador.
+3.  **Sistemas (`eter_core/systems`):** Fe, infección, economía, cultistas, spawn de monstruos, combate, objetos, mercader, herrero, precios, peso y hambre.
+4.  **Infraestructura (`eter_infrastructure`):** `EventBus` para comunicación entre mecánicas.
 5.  **Importación de mundo (`eter_infrastructure/persistence`):** `AzgaarTranslator` traduce la exportación real de Azgaar (`pack.states`, `pack.provinces` y `pack.cells`) a estados y regiones normalizadas.
 6.  **Escala territorial:** El mapa actual aporta 18 estados soberanos, 252 provincias simulables y 5.709 celdas terrestres.
+
+### 4.1. Catálogos de Datos (Data-Driven)
+El mundo es 100% data-driven: nada se hardcodea en los sistemas.
+
+* **`archetypes.py`**: 4 arquetipos de nacimiento con doble nombre y stats.
+  * Tanque / Coloso (alta vida y tenacidad), Mago / Erudito (alto maná e inteligencia), Caballero / Vanguardia (balanceado), Asesino / Acechador (alta estamina y +25% crítico).
+* **`products.py`**: metales (hierro → hierro rúnico → mithril), subproductos de monstruos y alimentos. Cada producto tiene rareza, valor base, dificultad, geografía nativa y peso.
+* **`monsters.py`**: bestiario de 15 criaturas por tiers 1-5, con drops que referencian productos válidos.
+* **`items.py`**: objetos consumibles, herramientas y equipables (con slot y peso).
+* **`recipes.py`**: 6 recetas de herrería que transforman materiales + oro en equipo.
+
+### 4.2. Sistemas Implementados
+| Sistema | Función |
+|---|---|
+| `FaithSystem` | El fervor baja con la infección; calcula la tasa de magos oscuros |
+| `InfectionSystem` | Propaga la plaga entre provincias adyacentes (grafo) |
+| `EconomicSystem` | Genera riqueza y comercio entre provincias |
+| `CultistSystem` | Spawn de cultistas según la tasa de fe |
+| `MonsterSpawnSystem` | Fauna salvaje emergente por bioma/infección/fe |
+| `CombatSystem` | Combate por turnos con crítico, tenacidad y drops |
+| `ItemSystem` | Dar/usar/equipar objetos |
+| `MerchantSystem` | Compra/venta de materiales con margen |
+| `SmithSystem` | Forja de equipo a partir de recetas |
+| `PricingSystem` | Precios dinámicos por ubicación + oferta/demanda |
+| `WeightSystem` | Peso, capacidad de carga y sobrecarga |
+| `HungerSystem` | Hambre por día con penalizaciones según arquetipo |
+| `SpawnSystem` | Creación del jugador con arquetipo elegible |
+
+### 4.3. Bucle de Juego Completo
+El jugador ya puede vivir un ciclo económico completo:
+
+```
+elegir arquetipo → explorar → cazar monstruos → drops → vender materiales
+→ comprar materiales → forjar equipo → equipar → cazar mejor
+```
+
+El mundo vive **sin el jugador**: monstruos, infección, fe, economía y precios evolucionan solos cada tick.
+
+### 4.4. Roadmap (visión de skitoji)
+Implementado:
+* ✅ Precios dinámicos (ubicación + oferta/demanda)
+* ✅ Sistema de peso
+* ✅ Hambre activa (ligada al día)
+* ✅ Arquetipos elegibles con atributos clave
+* ✅ Productos (hierro → hierro rúnico → mithril)
+* ✅ Bestiario completo + combate + drops
+* ✅ Mercader + herrero (economía de NPCs)
+
+Pendiente:
+* ⏳ Distancias (ciudad↔ciudad ≠ país↔país)
+* ⏳ Hechizos/habilidades (invisibilidad en área, buffs con mana)
+* ⏳ Eventos aleatorios de baja probabilidad
+* ⏳ Armaduras por clase (tank/arquero/mago)
+* ⏳ NPCs amistosos + interacción con el pueblo
+* ⏳ XP / nivel (progresión)
+* ⏳ Persistencia (guardar/cargar partida)
+* ⏳ Herreros/mercaderes como entidades del mundo con stock fluctuante
 
 El lore original se conserva e integra sobre esta geografía. La Infección Demoníaca puede surgir en provincias fronterizas o zonas salvajes; la Santa Iglesia puede medir el fervor por provincia o por estado; y los gremios pueden reaccionar a las crisis económicas y territoriales locales.
