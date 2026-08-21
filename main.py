@@ -17,10 +17,12 @@ from eter_core.domain.types import FaccionTipo, FervorReligioso, NivelInfeccion
 from eter_core.engine import EterEngine
 from eter_core.systems.economic_system import EconomicSystem
 from eter_core.systems.combat_system import CombatSystem
+from eter_core.systems.hunger_system import HungerSystem
 from eter_core.systems.item_system import ItemSystem
 from eter_core.systems.merchant_system import MerchantSystem
 from eter_core.systems.smith_system import SmithSystem
 from eter_core.systems.spawn_system import SpawnSystem
+from eter_core.systems.weight_system import WeightSystem
 from eter_infrastructure.messaging.event_bus import EventBus
 from eter_infrastructure.persistence.azgaar_loader import AzgaarTranslator
 
@@ -130,7 +132,8 @@ def _mostrar_estado_jugador(engine: EterEngine, player: PlayerComponent, ciclo: 
     print(f"HIJO DE LA LUZ | Turno {ciclo} | {_nombre_actual(engine, player)} ({engine.province_state_names[territory.azgaar_id]})")
     print(f"Arquetipo: {arquetipo.nombre} | Marca de la Estrella: {player.marca_de_la_estrella}")
     print(f"HP {player.vida}/{player.vida_maxima} | Mana {player.mana}/{player.mana_maximo} | Estamina {player.estamina}/{player.estamina_maxima}")
-    print(f"Hambre {player.hambre}/100 | Critico +{player.bonus_critico * 100:.0f}% | Oro {player.oro:.1f}")
+    print(f"Hambre {player.hambre:.0f}/100 ({HungerSystem.estado(player)}) | Critico +{player.bonus_critico * 100:.0f}% | Oro {player.oro:.1f}")
+    print(f"Carga {WeightSystem.peso_total(player):.1f}/{WeightSystem.capacidad_maxima(player):.0f} kg" + (" ⚠️ SOBRECARGADO" if WeightSystem.esta_sobrecargado(player) else ""))
     print(f"Fuerza {player.fuerza}(+{bonos.get('fuerza', 0):.0f}) | Inteligencia {player.inteligencia}(+{bonos.get('inteligencia', 0):.0f}) | Tenacidad {player.tenacidad}(+{bonos.get('tenacidad', 0):.0f})")
     inventario = ', '.join(f"{item} x{cantidad}" for item, cantidad in player.inventario.items()) or "vacio"
     print(f"Inventario: {inventario}")
@@ -156,6 +159,11 @@ def _mostrar_menu_local(engine: EterEngine, player: PlayerComponent) -> Dict[str
     print("[3] Usar objeto")
     print("[4] Pasar turno")
     return {str(index): entity_id for index, entity_id in enumerate(neighbours, start=1)}
+
+
+def _bioma_actual(engine: EterEngine, player: PlayerComponent) -> str:
+    market = engine.componentes[TradeComponent][_provincia_actual(engine, player)]
+    return market.bioma
 
 
 def _cazar(engine: EterEngine, player: PlayerComponent) -> None:
@@ -284,6 +292,9 @@ def iniciar_simulacion() -> None:
             if player.estamina < 10:
                 print("No tienes suficiente estamina para viajar.")
                 continue
+            if WeightSystem.esta_sobrecargado(player):
+                print("Vas demasiado cargado. Vende o suelta peso antes de viajar.")
+                continue
             territory = engine.componentes[TerritoryComponent][destination]
             player.provincia_actual = territory.azgaar_id
             player.celda_actual = _celda_de_provincia(engine, territory.azgaar_id)
@@ -324,7 +335,8 @@ def iniciar_simulacion() -> None:
                 cantidad = int(args[-1])
                 args = args[:-1]
             producto = " ".join(args)
-            mensaje = MerchantSystem.vender(player, producto, cantidad)
+            bioma = _bioma_actual(engine, player)
+            mensaje = MerchantSystem.vender(player, producto, cantidad, bioma=bioma)
             print(mensaje if mensaje else "No puedes vender eso (no lo tienes o producto inválido).")
             continue
         elif comando.startswith("comprar "):
@@ -334,7 +346,8 @@ def iniciar_simulacion() -> None:
                 cantidad = int(args[-1])
                 args = args[:-1]
             producto = " ".join(args)
-            mensaje = MerchantSystem.comprar(player, producto, cantidad)
+            bioma = _bioma_actual(engine, player)
+            mensaje = MerchantSystem.comprar(player, producto, cantidad, bioma=bioma)
             print(mensaje if mensaje else "No puedes comprar eso (oro insuficiente o producto inválido).")
             continue
         elif comando == "forjar":
@@ -396,6 +409,8 @@ def iniciar_simulacion() -> None:
             continue
 
         player.estamina = min(player.estamina_maxima, player.estamina + 5)
+        # El hambre avanza con el paso del día (un turno ≈ un día).
+        HungerSystem.avanzar(player)
         engine.tick()
         ciclo += 1
 
