@@ -2,17 +2,16 @@ import random
 from typing import Any, Dict, Iterable, Optional, Tuple
 
 from eter_core.components.player_component import PlayerComponent
+from eter_core.domain.archetypes import CATALOGO_ARQUETIPOS
 
 
 class SpawnSystem:
-    """Selecciona una celda terrestre y devuelve su provincia Azgaar."""
+    """Selecciona una celda terrestre y crea al Hijo de la Luz con un arquetipo de nacimiento."""
 
-    POTENCIALES = {
-        "Tanque": {"vida_maxima": 140, "mana_maximo": 30, "fuerza": 14, "inteligencia": 7, "tenacidad": 16},
-        "Mago": {"vida_maxima": 80, "mana_maximo": 120, "fuerza": 7, "inteligencia": 16, "tenacidad": 8},
-        "Caballero": {"vida_maxima": 110, "mana_maximo": 55, "fuerza": 12, "inteligencia": 10, "tenacidad": 12},
-        "Asesino": {"vida_maxima": 90, "mana_maximo": 45, "fuerza": 15, "inteligencia": 12, "tenacidad": 7},
-    }
+    @classmethod
+    def arquetipos_disponibles(cls) -> list[str]:
+        """Devuelve las claves de los arquetipos en orden estable."""
+        return list(CATALOGO_ARQUETIPOS)
 
     @classmethod
     def celdas_terrestres(cls, raw_data: Dict[str, Any], valid_province_ids: Iterable[int]) -> list[Tuple[int, int]]:
@@ -32,27 +31,32 @@ class SpawnSystem:
         raw_data: Dict[str, Any],
         valid_province_ids: Iterable[int],
         rng: Optional[random.Random] = None,
-        potencial: Optional[str] = None,
+        arquetipo: Optional[str] = None,
     ) -> PlayerComponent:
         randomizer = rng or random.Random()
         land_cells = cls.celdas_terrestres(raw_data, valid_province_ids)
         if not land_cells:
             raise ValueError("El mapa no contiene celdas terrestres validas para el spawn.")
         cell_id, province_id = randomizer.choice(land_cells)
-        chosen_potential = potencial or randomizer.choice(list(cls.POTENCIALES))
-        if chosen_potential not in cls.POTENCIALES:
-            raise ValueError(f"Potencial de nacimiento desconocido: {chosen_potential}")
-        stats = cls.POTENCIALES[chosen_potential]
+
+        chosen_archetype = arquetipo or randomizer.choice(cls.arquetipos_disponibles())
+        if chosen_archetype not in CATALOGO_ARQUETIPOS:
+            raise ValueError(f"Arquetipo de nacimiento desconocido: {chosen_archetype}")
+        stats = CATALOGO_ARQUETIPOS[chosen_archetype]
+
         mark = randomizer.choice(["hombro", "pecho", "espalda", "antebrazo", "nuca"])
         return PlayerComponent(
-            vida=stats["vida_maxima"],
-            vida_maxima=stats["vida_maxima"],
-            mana=stats["mana_maximo"],
-            mana_maximo=stats["mana_maximo"],
-            fuerza=stats["fuerza"],
-            inteligencia=stats["inteligencia"],
-            tenacidad=stats["tenacidad"],
-            potencial_nacimiento=chosen_potential,
+            vida=stats.vida_maxima,
+            vida_maxima=stats.vida_maxima,
+            mana=stats.mana_maximo,
+            mana_maximo=stats.mana_maximo,
+            fuerza=stats.fuerza,
+            inteligencia=stats.inteligencia,
+            estamina=stats.estamina_maxima,
+            estamina_maxima=stats.estamina_maxima,
+            tenacidad=stats.tenacidad,
+            bonus_critico=stats.bonus_critico,
+            potencial_nacimiento=chosen_archetype,
             marca_de_la_estrella=mark,
             celda_actual=cell_id,
             provincia_actual=province_id,

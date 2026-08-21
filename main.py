@@ -11,6 +11,7 @@ from eter_core.components.enemy_component import EnemyComponent
 from eter_core.components.player_component import PlayerComponent
 from eter_core.components.region_component import RegiónComponent, StateComponent, TerritoryComponent
 from eter_core.components.trade_component import TradeComponent
+from eter_core.domain.archetypes import CATALOGO_ARQUETIPOS
 from eter_core.domain.events import ComercioRealizadoEvent, HegemoniaIglesiaRotasEvent
 from eter_core.domain.types import FaccionTipo, FervorReligioso, NivelInfeccion
 from eter_core.engine import EterEngine
@@ -120,13 +121,18 @@ def _nombre_actual(engine: EterEngine, player: PlayerComponent) -> str:
 
 def _mostrar_estado_jugador(engine: EterEngine, player: PlayerComponent, ciclo: int) -> None:
     territory = engine.componentes[TerritoryComponent][_provincia_actual(engine, player)]
+    arquetipo = CATALOGO_ARQUETIPOS[player.potencial_nacimiento]
+    bonos = ItemSystem.bonos_equipados(player)
     print("\n" + "=" * 60)
     print(f"HIJO DE LA LUZ | Turno {ciclo} | {_nombre_actual(engine, player)} ({engine.province_state_names[territory.azgaar_id]})")
-    print(f"Potencial: {player.potencial_nacimiento} | Marca de la Estrella: {player.marca_de_la_estrella}")
+    print(f"Arquetipo: {arquetipo.nombre} | Marca de la Estrella: {player.marca_de_la_estrella}")
     print(f"HP {player.vida}/{player.vida_maxima} | Mana {player.mana}/{player.mana_maximo} | Estamina {player.estamina}/{player.estamina_maxima}")
-    print(f"Fuerza {player.fuerza} | Inteligencia {player.inteligencia} | Tenacidad {player.tenacidad}")
+    print(f"Hambre {player.hambre}/100 | Critico +{player.bonus_critico * 100:.0f}%")
+    print(f"Fuerza {player.fuerza}(+{bonos.get('fuerza', 0):.0f}) | Inteligencia {player.inteligencia}(+{bonos.get('inteligencia', 0):.0f}) | Tenacidad {player.tenacidad}(+{bonos.get('tenacidad', 0):.0f})")
     inventario = ', '.join(f"{item} x{cantidad}" for item, cantidad in player.inventario.items()) or "vacio"
-    print(f"Inventario: {inventario} | Equipado: {player.objeto_equipado or 'ninguno'}")
+    print(f"Inventario: {inventario}")
+    equipado = ', '.join(f"{slot}: {objeto}" for slot, objeto in player.equipamiento.items()) or "ninguno"
+    print(f"Equipado: {equipado}")
     print("=" * 60)
 
 
@@ -201,13 +207,24 @@ def _usar_objeto(player: PlayerComponent, nombre_objeto: str) -> None:
 def iniciar_simulacion() -> None:
     engine, state_entities, province_entities, fondos_jugador = cargar_mundo()
     engine.province_entities = province_entities
-    player_entity = engine.crear_entidad()
-    player = SpawnSystem.crear_jugador(engine.map_raw, province_entities, potencial=None)
-    engine.agregar_componente(player_entity, player)
 
     print("--- BIENVENIDO A ETER ---")
     print(f"Mapa cargado: {len(state_entities)} estados y {len(province_entities)} provincias.")
-    print(f"Has despertado en {_nombre_actual(engine, player)}. No necesitas conocer el mapa: las rutas locales te guiaran.")
+    print("\nElige tu Potencial de Nacimiento:")
+    for index, clave in enumerate(SpawnSystem.arquetipos_disponibles(), start=1):
+        arquetipo = CATALOGO_ARQUETIPOS[clave]
+        print(f"  [{index}] {arquetipo.nombre} — {arquetipo.descripcion}")
+    eleccion = input("Arquetipo [1-4 o Enter para aleatorio] > ").strip()
+    arquetipo_elegido = None
+    if eleccion.isdigit() and 1 <= int(eleccion) <= len(SpawnSystem.arquetipos_disponibles()):
+        arquetipo_elegido = SpawnSystem.arquetipos_disponibles()[int(eleccion) - 1]
+
+    player_entity = engine.crear_entidad()
+    player = SpawnSystem.crear_jugador(engine.map_raw, province_entities, arquetipo=arquetipo_elegido)
+    engine.agregar_componente(player_entity, player)
+
+    arquetipo = CATALOGO_ARQUETIPOS[player.potencial_nacimiento]
+    print(f"\nHas despertado como {arquetipo.nombre} en {_nombre_actual(engine, player)}. No necesitas conocer el mapa: las rutas locales te guiaran.")
     ciclo = 1
     while player.esta_vivo():
         _mostrar_estado_jugador(engine, player, ciclo)
@@ -244,7 +261,12 @@ def iniciar_simulacion() -> None:
             _mostrar_estado_jugador(engine, player, ciclo)
         elif comando.startswith("objeto equipar "):
             nombre_objeto = comando.removeprefix("objeto equipar ").strip()
-            print("Objeto equipado." if player.equipar(nombre_objeto) else "No tienes ese objeto.")
+            mensaje = ItemSystem.equipar(player, nombre_objeto)
+            print(mensaje if mensaje else "No puedes equipar eso (no existe, no es equipable, o no lo tienes).")
+        elif comando.startswith("objeto desequipar "):
+            slot = comando.removeprefix("objeto desequipar ").strip()
+            mensaje = ItemSystem.desequipar(player, slot)
+            print(mensaje if mensaje else "No tienes nada equipado en ese slot.")
         elif comando.startswith("objeto usar "):
             nombre_objeto = comando.removeprefix("objeto usar ").strip()
             if nombre_objeto.isdigit():

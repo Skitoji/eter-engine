@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Dict
+from typing import Dict, Optional
 
 
 class TipoObjeto(Enum):
@@ -12,26 +12,35 @@ class TipoObjeto(Enum):
 
 @dataclass(frozen=True)
 class ItemDef:
-    """Definición inmutable de un objeto. Los efectos son modificadores de stats del jugador."""
+    """
+    Definición inmutable de un objeto.
+
+    - `efectos`: modificadores de stats (vida, mana, estamina, hambre, fuerza...).
+      En consumibles se aplican al usarlos; en equipables son el bono pasivo.
+    - `slot`: para EQUIPABLE, el hueco que ocupa ("arma", "armadura", "accesorio").
+    """
     nombre: str
     tipo: TipoObjeto
     descripcion: str
     efectos: Dict[str, float] = field(default_factory=dict)
+    slot: Optional[str] = None
 
 
 # Catálogo central de objetos. Añadir un objeto nuevo es tan simple como
 # agregar una entrada aquí: el ItemSystem lo expone automáticamente.
 CATALOGO_OBJETOS: Dict[str, ItemDef] = {
+    # ── Herramientas ────────────────────────────────────────────────
     "brujula": ItemDef(
         nombre="brujula",
         tipo=TipoObjeto.HERRAMIENTA,
         descripcion="Revela tus rutas adyacentes.",
     ),
+    # ── Consumibles (curación / maná / energía) ─────────────────────
     "raciones": ItemDef(
         nombre="raciones",
         tipo=TipoObjeto.CONSUMIBLE,
-        descripcion="Alimento básico de viaje. Restaura 20 HP.",
-        efectos={"vida": 20},
+        descripcion="Alimento básico de viaje. Restaura 20 HP y 15 de hambre.",
+        efectos={"vida": 20, "hambre": 15},
     ),
     "antorcha": ItemDef(
         nombre="antorcha",
@@ -50,5 +59,46 @@ CATALOGO_OBJETOS: Dict[str, ItemDef] = {
         tipo=TipoObjeto.CONSUMIBLE,
         descripcion="Licor azulado que restaura 30 de mana.",
         efectos={"mana": 30},
+    ),
+    # ── Alimentos (vinculados al catálogo de productos) ──────────────
+    "pan": ItemDef(
+        nombre="pan",
+        tipo=TipoObjeto.CONSUMIBLE,
+        descripcion="Hogaza de pan. Sacia 25 de hambre.",
+        efectos={"hambre": 25},
+    ),
+    "carne": ItemDef(
+        nombre="carne",
+        tipo=TipoObjeto.CONSUMIBLE,
+        descripcion="Carne asada. Sacia 40 de hambre.",
+        efectos={"hambre": 40},
+    ),
+    "setas": ItemDef(
+        nombre="setas",
+        tipo=TipoObjeto.CONSUMIBLE,
+        descripcion="Setas silvestres. Sacian 15 de hambre.",
+        efectos={"hambre": 15},
+    ),
+    # ── Equipables ──────────────────────────────────────────────────
+    "espada_hierro": ItemDef(
+        nombre="espada de hierro",
+        tipo=TipoObjeto.EQUIPABLE,
+        descripcion="Hoja forjada en hierro. +3 Fuerza.",
+        efectos={"fuerza": 3},
+        slot="arma",
+    ),
+    "armadura_cuero": ItemDef(
+        nombre="armadura de cuero",
+        tipo=TipoObjeto.EQUIPABLE,
+        descripcion="Protección ligera. +2 Tenacidad.",
+        efectos={"tenacidad": 2},
+        slot="armadura",
+    ),
+    "anillo_estrella": ItemDef(
+        nombre="anillo de la estrella",
+        tipo=TipoObjeto.EQUIPABLE,
+        descripcion="Reliquia de la Luz. +2 Inteligencia.",
+        efectos={"inteligencia": 2},
+        slot="accesorio",
     ),
 }

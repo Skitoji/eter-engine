@@ -14,8 +14,11 @@ class PlayerComponent:
     estamina: int = 100
     estamina_maxima: int = 100
     tenacidad: int = 10
-    potencial_nacimiento: str = "Caballero"
+    bonus_critico: float = 0.0
+    potencial_nacimiento: str = "caballero"
+    hambre: int = 100          # 100 = saciado, 0 = famélico
     inventario: Dict[str, int] = field(default_factory=lambda: {"brujula": 1, "raciones": 3, "antorcha": 1})
+    equipamiento: Dict[str, str] = field(default_factory=dict)  # slot -> clave de objeto
     objeto_equipado: Optional[str] = None
     marca_de_la_estrella: str = "pecho"
     celda_actual: int = 0
@@ -41,11 +44,13 @@ class PlayerComponent:
             del self.inventario[nombre]
         return True
 
-    def equipar(self, nombre: str) -> bool:
-        if not self.tiene(nombre):
-            return False
-        self.objeto_equipado = nombre
-        return True
+    def equipar(self, slot: str, nombre: str) -> None:
+        """Equipa un objeto en un slot (arma, armadura, accesorio...)."""
+        self.equipamiento[slot] = nombre
+
+    def desequipar(self, slot: str) -> Optional[str]:
+        """Retira y devuelve el objeto equipado en un slot, o None si estaba vacío."""
+        return self.equipamiento.pop(slot, None)
 
     def aplicar_efectos(self, efectos: Dict[str, float]) -> None:
         """Aplica modificadores de stats, sin superar los máximos."""
@@ -55,6 +60,8 @@ class PlayerComponent:
             self.mana = min(self.mana_maximo, self.mana + efectos["mana"])
         if "estamina" in efectos:
             self.estamina = min(self.estamina_maxima, self.estamina + efectos["estamina"])
+        if "hambre" in efectos:
+            self.hambre = min(100, max(0, self.hambre + efectos["hambre"]))
         if "fuerza" in efectos:
             self.fuerza += efectos["fuerza"]
         if "inteligencia" in efectos:

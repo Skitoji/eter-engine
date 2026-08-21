@@ -58,13 +58,13 @@ class EconomyIntegrationTests(unittest.TestCase):
             engine.map_raw,
             province_entities,
             rng=random.Random(7),
-            potencial="Mago",
+            arquetipo="mago",
         )
         land_cells = dict(SpawnSystem.celdas_terrestres(engine.map_raw, province_entities))
         self.assertIn(player.celda_actual, land_cells)
         self.assertIn(player.provincia_actual, province_entities)
-        self.assertEqual(player.potencial_nacimiento, "Mago")
-        self.assertEqual(player.mana_maximo, 120)
+        self.assertEqual(player.potencial_nacimiento, "mago")
+        self.assertEqual(player.mana_maximo, 130)
         self.assertIn(player.marca_de_la_estrella, {"hombro", "pecho", "espalda", "antebrazo", "nuca"})
 
     def test_product_route_uses_distance_and_danger(self) -> None:
