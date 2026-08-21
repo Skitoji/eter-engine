@@ -14,6 +14,8 @@ class PlayerComponent:
     estamina: int = 100
     estamina_maxima: int = 100
     tenacidad: int = 10
+    defensa: int = 0
+    agilidad: int = 10
     bonus_critico: float = 0.0
     potencial_nacimiento: str = "caballero"
     nivel: int = 1
@@ -80,3 +82,7 @@ class PlayerComponent:
             self.inteligencia += efectos["inteligencia"]
         if "tenacidad" in efectos:
             self.tenacidad += efectos["tenacidad"]
+        if "defensa" in efectos:
+            self.defensa += efectos["defensa"]
+        if "agilidad" in efectos:
+            self.agilidad += efectos["agilidad"]

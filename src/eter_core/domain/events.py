@@ -78,3 +78,4 @@ class CombateResueltoEvent(DomainEvent):
     daño_infligido: int
     daño_recibido: int
     drops: dict
+    huido: bool = False

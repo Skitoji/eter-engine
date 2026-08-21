@@ -44,8 +44,8 @@ CATALOGO_HECHIZOS: Dict[str, HechizoDef] = {
         nombre="Escudo Arcano",
         tipo=TipoHechizo.BUFF,
         coste_mana=20.0,
-        descripcion="Aumenta la Tenacidad en +5 durante 2 turnos.",
-        efectos={"tenacidad": 5.0},
+        descripcion="Aumenta la Defensa en +5 durante 2 turnos.",
+        efectos={"defensa": 5.0},
         duracion_turnos=2,
     ),
     "curacion": HechizoDef(

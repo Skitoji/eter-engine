@@ -55,6 +55,8 @@ class SpawnSystem:
             estamina=stats.estamina_maxima,
             estamina_maxima=stats.estamina_maxima,
             tenacidad=stats.tenacidad,
+            defensa=stats.defensa,
+            agilidad=stats.agilidad,
             bonus_critico=stats.bonus_critico,
             potencial_nacimiento=chosen_archetype,
             marca_de_la_estrella=mark,

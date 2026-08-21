@@ -102,8 +102,8 @@ CATALOGO_OBJETOS: Dict[str, ItemDef] = {
     "armadura_cuero": ItemDef(
         nombre="armadura de cuero",
         tipo=TipoObjeto.EQUIPABLE,
-        descripcion="Protección ligera. +2 Tenacidad.",
-        efectos={"tenacidad": 2},
+        descripcion="Protección ligera. +3 Defensa.",
+        efectos={"defensa": 3},
         slot="armadura",
         peso=4.0,
     ),
@@ -134,8 +134,8 @@ CATALOGO_OBJETOS: Dict[str, ItemDef] = {
     "armadura_mithril": ItemDef(
         nombre="armadura de mithril",
         tipo=TipoObjeto.EQUIPABLE,
-        descripcion="Coraza ligendaria. +8 Tenacidad.",
-        efectos={"tenacidad": 8},
+        descripcion="Coraza ligendaria. +10 Defensa.",
+        efectos={"defensa": 10},
         slot="armadura",
         peso=6.0,
     ),

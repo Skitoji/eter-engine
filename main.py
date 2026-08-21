@@ -18,7 +18,7 @@ from eter_core.domain.events import ComercioRealizadoEvent, HegemoniaIglesiaRota
 from eter_core.domain.types import FaccionTipo, FervorReligioso, NivelInfeccion
 from eter_core.engine import EterEngine
 from eter_core.systems.economic_system import EconomicSystem
-from eter_core.systems.combat_system import CombatSystem
+from eter_core.systems.combat_system import AccionCombate, CombatSystem
 from eter_core.systems.hunger_system import HungerSystem
 from eter_core.systems.item_system import ItemSystem
 from eter_core.systems.merchant_system import MerchantSystem
@@ -150,6 +150,7 @@ def _mostrar_estado_jugador(engine: EterEngine, player: PlayerComponent, ciclo: 
         print(f"Hechizos activos: {buffs}")
     print(f"Carga {WeightSystem.peso_total(player):.1f}/{WeightSystem.capacidad_maxima(player):.0f} kg" + (" ⚠️ SOBRECARGADO" if WeightSystem.esta_sobrecargado(player) else ""))
     print(f"Fuerza {player.fuerza}(+{bonos.get('fuerza', 0):.0f}) | Inteligencia {player.inteligencia}(+{bonos.get('inteligencia', 0):.0f}) | Tenacidad {player.tenacidad}(+{bonos.get('tenacidad', 0):.0f})")
+    print(f"Defensa {player.defensa}(+{bonos.get('defensa', 0):.0f}) | Agilidad {player.agilidad}(+{bonos.get('agilidad', 0):.0f})")
     inventario = ', '.join(f"{ItemSystem.definicion(item).nombre} x{cantidad}" for item, cantidad in player.inventario.items()) or "vacio"
     print(f"Inventario: {inventario}")
     materiales = ', '.join(f"{mat} x{cantidad}" for mat, cantidad in player.materiales.items()) or "ninguno"
@@ -233,6 +234,7 @@ def _mostrar_ayuda() -> None:
     print("  mover <n>            Viajar a una provincia adyacente")
     print("  explorar             Explorar la zona actual")
     print("  cazar                Combatir monstruos presentes")
+    print("    (en combate: atacar / defender / parar / hechizo <n> / objeto <n> / huir)")
     print("  objeto ver           Ver inventario")
     print("  objeto usar <n>      Usar un objeto (por nombre o número)")
     print("  objeto equipar <n>   Equipar un objeto")
@@ -265,32 +267,79 @@ def _cazar(engine: EterEngine, player: PlayerComponent) -> None:
         print("No hay monstruos visibles en esta provincia. Explora o espera a que aparezcan.")
         return
     monstruo_clave = random.choice(list(enemy.monstruos.keys()))
-    monstruo = enemy.monstruos[monstruo_clave]
-    print(f"\n⚔️  Un {monstruo_clave.title()} bloquea tu camino. Te preparas para el combate...")
-    resultado = CombatSystem.resolver(player, monstruo_clave)
-    print(f"Combate: {resultado.turnos} turnos | Daño infligido: {resultado.daño_infligido} | Daño recibido: {resultado.daño_recibido}")
-    if resultado.victoria:
-        print("🏆 ¡Victoria!")
-        if resultado.drops:
-            for producto, cantidad in resultado.drops.items():
+    from eter_core.domain.monsters import CATALOGO_MONSTRUOS
+    monstruo = CATALOGO_MONSTRUOS[monstruo_clave]
+    print(f"\n⚔️  Un {monstruo.nombre} bloquea tu camino. ¡Te preparas para el combate!")
+    print(f"    {monstruo.descripcion}")
+
+    estado = CombatSystem.iniciar(player, monstruo_clave)
+
+    while not estado.finalizado:
+        print(f"\n--- Turno {estado.turno + 1} ---")
+        print(f"  {monstruo.nombre}: {estado.hp_monstruo}/{monstruo.vida} HP")
+        print(f"  Tú: {player.vida}/{player.vida_maxima} HP | {player.mana}/{player.mana_maximo} Maná | {player.estamina}/{player.estamina_maxima} Estamina")
+        comando = input("  Acción [atacar/defender/parar/hechizo/objeto/huir] > ").strip().casefold()
+
+        # Ayuda contextual dentro del combate
+        if comando in ("hechizo", "hechizos", "magia"):
+            print("  Hechizos disponibles:")
+            for clave, hechizo in SpellSystem._hechizos().items():
+                print(f"    [{clave}] {hechizo.nombre} — {hechizo.coste_mana:.0f} mana — {hechizo.descripcion}")
+            continue
+        if comando in ("objeto", "objetos", "inventario", "objeto ver"):
+            if player.inventario:
+                print("  Inventario:")
+                for item, cantidad in player.inventario.items():
+                    print(f"    {item} x{cantidad}")
+            else:
+                print("  Inventario vacío.")
+            continue
+
+        accion = None
+        nombre = None
+        if comando in ("atacar", "a", "ataca"):
+            accion = AccionCombate.ATACAR
+        elif comando in ("defender", "d", "defiende", "defensa", "bloquear"):
+            accion = AccionCombate.DEFENDER
+        elif comando in ("parar", "parry", "p"):
+            accion = AccionCombate.PARRY
+        elif comando in ("huir", "h", "escapar", "flee"):
+            accion = AccionCombate.HUIR
+        elif comando.startswith("hechizo "):
+            accion = AccionCombate.HECHIZO
+            nombre = comando.removeprefix("hechizo ").strip()
+        elif comando.startswith("objeto "):
+            accion = AccionCombate.OBJETO
+            nombre = comando.removeprefix("objeto ").strip()
+        else:
+            print("  Acción no reconocida. Escribe: atacar / defender / parar / hechizo <n> / objeto <n> / huir")
+            continue
+
+        resultado = CombatSystem.turno_jugador(player, estado, accion, nombre=nombre)
+        print(f"  {resultado.detalle}")
+
+    if estado.victoria:
+        print("\n🏆 ¡Victoria!")
+        if estado.drops:
+            for producto, cantidad in estado.drops.items():
                 print(f"  💎 Obtienes: {producto} x{cantidad}")
         else:
             print("  (El monstruo no dejó nada esta vez.)")
         enemy.monstruos[monstruo_clave] -= 1
         if enemy.monstruos[monstruo_clave] <= 0:
             del enemy.monstruos[monstruo_clave]
-        # XP por derrotar al monstruo (según su tier)
-        from eter_core.domain.monsters import CATALOGO_MONSTRUOS
-        tier = CATALOGO_MONSTRUOS[monstruo_clave].tier
+        tier = monstruo.tier
         xp = ProgressionSystem.xp_por_tier(tier)
         niveles = ProgressionSystem.otorgar_xp(player, xp)
         print(f"  ✨ Ganas {xp} XP.")
         for nivel in niveles:
             print(f"  🎖️ ¡Has subido al nivel {nivel}!")
+    elif estado.huido:
+        print("\n🏃 Has huido del combate. El monstruo sigue merodeando.")
     else:
-        print("💀 Has sido derrotado...")
-    CombatSystem.aplicar_resultado(player, resultado)
-    player.estamina = max(0, player.estamina - 15)
+        print("\n💀 Has sido derrotado...")
+
+    player.estamina = max(0, player.estamina - 10)
 
 
 def _mostrar_provincia(engine: EterEngine, entity_id: int) -> None:

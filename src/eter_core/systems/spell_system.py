@@ -87,6 +87,6 @@ class SpellSystem:
             if hechizo is None:
                 continue
             # Revertir efecto del buff expirado
-            reversion = {k: -v for k, v in hechizo.efectos.items() if k in ("fuerza", "tenacidad", "inteligencia")}
+            reversion = {k: -v for k, v in hechizo.efectos.items() if k in ("fuerza", "tenacidad", "inteligencia", "defensa", "agilidad")}
             if reversion:
                 player.aplicar_efectos(reversion)

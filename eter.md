@@ -91,9 +91,9 @@ Se ha configurado el núcleo del motor (`eter-engine`) en Python con tipado estr
 El mundo es 100% data-driven: nada se hardcodea en los sistemas.
 
 * **`archetypes.py`**: 4 arquetipos de nacimiento con doble nombre y stats.
-  * Tanque / Coloso (alta vida y tenacidad), Mago / Erudito (alto maná e inteligencia), Caballero / Vanguardia (balanceado), Asesino / Acechador (alta estamina y +25% crítico).
+  * Tanque / Coloso (alta vida, tenacidad y defensa), Mago / Erudito (alto maná e inteligencia), Caballero / Vanguardia (balanceado), Asesino / Acechador (alta agilidad y +25% crítico).
 * **`products.py`**: metales (hierro → hierro rúnico → mithril), subproductos de monstruos y alimentos. Cada producto tiene rareza, valor base, dificultad, geografía nativa y peso.
-* **`monsters.py`**: bestiario de 15 criaturas por tiers 1-5, con drops que referencian productos válidos.
+* **`monsters.py`**: bestiario de 15 criaturas por tiers 1-5, con drops válidos y stats de defensa/agilidad.
 * **`items.py`**: objetos consumibles, herramientas y equipables (con slot, peso y conjunto).
 * **`recipes.py`**: recetas de herrería (incluye las 36 piezas de set generadas automáticamente).
 * **`spells.py`**: 6 hechizos (buff, curación, área, daño).
@@ -108,7 +108,7 @@ El mundo es 100% data-driven: nada se hardcodea en los sistemas.
 | `EconomicSystem` | Genera riqueza y comercio entre provincias |
 | `CultistSystem` | Spawn de cultistas según la tasa de fe |
 | `MonsterSpawnSystem` | Fauna salvaje emergente por bioma/infección/fe |
-| `CombatSystem` | Combate por turnos con crítico, tenacidad y drops |
+| `CombatSystem` | Combate táctico por turnos: atacar/defender/parry/hechizo/objeto/huir, esquiva, iniciativa de huida e IA de monstruo |
 | `ItemSystem` | Dar/usar/equipar objetos |
 | `MerchantSystem` | Compra/venta de materiales con margen |
 | `SmithSystem` | Forja de equipo a partir de recetas |
@@ -143,6 +143,7 @@ Completado:
 * ✅ Arquetipos elegibles con atributos clave
 * ✅ Productos (hierro → hierro rúnico → mithril)
 * ✅ Bestiario completo + combate + drops
+* ✅ Combate táctico por turnos (defender, parry, huida, esquiva, hechizos/objetos en combate)
 * ✅ Mercader + herrero (economía de NPCs)
 * ✅ Distancias (ciudad↔ciudad ≠ país↔país)
 * ✅ Hechizos/habilidades (invisibilidad en área, buffs con mana)
