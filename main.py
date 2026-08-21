@@ -20,8 +20,12 @@ from eter_core.systems.combat_system import CombatSystem
 from eter_core.systems.hunger_system import HungerSystem
 from eter_core.systems.item_system import ItemSystem
 from eter_core.systems.merchant_system import MerchantSystem
+from eter_core.systems.progression_system import ProgressionSystem
+from eter_core.systems.random_event_system import RandomEventSystem
 from eter_core.systems.smith_system import SmithSystem
 from eter_core.systems.spawn_system import SpawnSystem
+from eter_core.systems.spell_system import SpellSystem
+from eter_core.systems.travel_system import TravelSystem
 from eter_core.systems.weight_system import WeightSystem
 from eter_infrastructure.messaging.event_bus import EventBus
 from eter_infrastructure.persistence.azgaar_loader import AzgaarTranslator
@@ -133,6 +137,10 @@ def _mostrar_estado_jugador(engine: EterEngine, player: PlayerComponent, ciclo: 
     print(f"Arquetipo: {arquetipo.nombre} | Marca de la Estrella: {player.marca_de_la_estrella}")
     print(f"HP {player.vida}/{player.vida_maxima} | Mana {player.mana}/{player.mana_maximo} | Estamina {player.estamina}/{player.estamina_maxima}")
     print(f"Hambre {player.hambre:.0f}/100 ({HungerSystem.estado(player)}) | Critico +{player.bonus_critico * 100:.0f}% | Oro {player.oro:.1f}")
+    print(f"Nivel {player.nivel} ({player.experiencia:.0f}/{ProgressionSystem.xp_requerida(player.nivel):.0f} XP)")
+    if player.hechizos_activos:
+        buffs = ', '.join(f"{h} ({t}t)" for h, t in player.hechizos_activos.items())
+        print(f"Hechizos activos: {buffs}")
     print(f"Carga {WeightSystem.peso_total(player):.1f}/{WeightSystem.capacidad_maxima(player):.0f} kg" + (" ⚠️ SOBRECARGADO" if WeightSystem.esta_sobrecargado(player) else ""))
     print(f"Fuerza {player.fuerza}(+{bonos.get('fuerza', 0):.0f}) | Inteligencia {player.inteligencia}(+{bonos.get('inteligencia', 0):.0f}) | Tenacidad {player.tenacidad}(+{bonos.get('tenacidad', 0):.0f})")
     inventario = ', '.join(f"{item} x{cantidad}" for item, cantidad in player.inventario.items()) or "vacio"
@@ -187,6 +195,14 @@ def _cazar(engine: EterEngine, player: PlayerComponent) -> None:
         enemy.monstruos[monstruo_clave] -= 1
         if enemy.monstruos[monstruo_clave] <= 0:
             del enemy.monstruos[monstruo_clave]
+        # XP por derrotar al monstruo (según su tier)
+        from eter_core.domain.monsters import CATALOGO_MONSTRUOS
+        tier = CATALOGO_MONSTRUOS[monstruo_clave].tier
+        xp = ProgressionSystem.xp_por_tier(tier)
+        niveles = ProgressionSystem.otorgar_xp(player, xp)
+        print(f"  ✨ Ganas {xp} XP.")
+        for nivel in niveles:
+            print(f"  🎖️ ¡Has subido al nivel {nivel}!")
     else:
         print("💀 Has sido derrotado...")
     CombatSystem.aplicar_resultado(player, resultado)
@@ -289,22 +305,40 @@ def iniciar_simulacion() -> None:
             if destination is None:
                 print("Ese destino no esta disponible desde tu provincia actual.")
                 continue
-            if player.estamina < 10:
-                print("No tienes suficiente estamina para viajar.")
-                continue
             if WeightSystem.esta_sobrecargado(player):
                 print("Vas demasiado cargado. Vende o suelta peso antes de viajar.")
+                continue
+            origen_id = _provincia_actual(engine, player)
+            destino_market = engine.componentes[TradeComponent][destination]
+            origen_market = engine.componentes[TradeComponent][origen_id]
+            origen_territory = engine.componentes[TerritoryComponent][origen_id]
+            destino_territory = engine.componentes[TerritoryComponent][destination]
+            mismo_estado = origen_territory.estado_id == destino_territory.estado_id
+            coste = TravelSystem.coste_viaje(origen_market, destino_market, mismo_estado)
+            if player.estamina < coste:
+                print(f"No tienes suficiente estamina (necesitas {coste:.0f}).")
                 continue
             territory = engine.componentes[TerritoryComponent][destination]
             player.provincia_actual = territory.azgaar_id
             player.celda_actual = _celda_de_provincia(engine, territory.azgaar_id)
-            player.estamina -= 10
-            print(f"Viajas a {engine.componentes[RegiónComponent][destination].nombre}.")
+            player.estamina -= coste
+            frontera = "" if mismo_estado else " (cruzas una frontera)"
+            print(f"Viajas a {engine.componentes[RegiónComponent][destination].nombre}{frontera}. Coste: {coste:.0f} estamina.")
             _contexto_local(engine, player)
         elif comando in ("2", "explorar"):
             _explorar(engine, player)
         elif comando in ("5", "cazar"):
             _cazar(engine, player)
+        elif comando == "hechizos":
+            print("Hechizos disponibles:")
+            for clave, hechizo in SpellSystem._hechizos().items():
+                print(f"  [{clave}] {hechizo.nombre} — {hechizo.coste_mana:.0f} mana — {hechizo.descripcion}")
+            continue
+        elif comando.startswith("hechizo "):
+            nombre = comando.removeprefix("hechizo ").strip()
+            mensaje = SpellSystem.lanzar(player, nombre)
+            print(mensaje if mensaje else "No puedes lanzar ese hechizo (inexistente o maná insuficiente).")
+            continue
         elif comando in ("3", "objeto", "usar objeto"):
             print("Uso: objeto ver | objeto usar [nombre o numero] | objeto equipar [nombre]")
         elif comando == "objeto ver":
@@ -411,6 +445,12 @@ def iniciar_simulacion() -> None:
         player.estamina = min(player.estamina_maxima, player.estamina + 5)
         # El hambre avanza con el paso del día (un turno ≈ un día).
         HungerSystem.avanzar(player)
+        # Los buffs/hechizos caducan con el tiempo.
+        SpellSystem.avanzar_turno(player)
+        # Eventos aleatorios de baja probabilidad.
+        evento = RandomEventSystem.procesar(player)
+        if evento is not None:
+            print(f"\n[EVENTO] {evento.descripcion}")
         engine.tick()
         ciclo += 1
 

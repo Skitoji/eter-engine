@@ -16,11 +16,14 @@ class PlayerComponent:
     tenacidad: int = 10
     bonus_critico: float = 0.0
     potencial_nacimiento: str = "caballero"
+    nivel: int = 1
+    experiencia: int = 0
     oro: float = 0.0           # riqueza líquida del jugador
     hambre: int = 100          # 100 = saciado, 0 = famélico
     inventario: Dict[str, int] = field(default_factory=lambda: {"brujula": 1, "raciones": 3, "antorcha": 1})
     materiales: Dict[str, int] = field(default_factory=dict)  # productos/drops de monstruos
     equipamiento: Dict[str, str] = field(default_factory=dict)  # slot -> clave de objeto
+    hechizos_activos: Dict[str, int] = field(default_factory=dict)  # hechizo -> turnos restantes
     objeto_equipado: Optional[str] = None
     marca_de_la_estrella: str = "pecho"
     celda_actual: int = 0
