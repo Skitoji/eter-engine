@@ -101,4 +101,25 @@ CATALOGO_OBJETOS: Dict[str, ItemDef] = {
         efectos={"inteligencia": 2},
         slot="accesorio",
     ),
+    "espada_runica": ItemDef(
+        nombre="espada de hierro rúnico",
+        tipo=TipoObjeto.EQUIPABLE,
+        descripcion="Hoja grabada con runas. +6 Fuerza.",
+        efectos={"fuerza": 6},
+        slot="arma",
+    ),
+    "espada_mithril": ItemDef(
+        nombre="espada de mithril",
+        tipo=TipoObjeto.EQUIPABLE,
+        descripcion="El metal más fuerte del mundo. +10 Fuerza.",
+        efectos={"fuerza": 10},
+        slot="arma",
+    ),
+    "armadura_mithril": ItemDef(
+        nombre="armadura de mithril",
+        tipo=TipoObjeto.EQUIPABLE,
+        descripcion="Coraza ligendaria. +8 Tenacidad.",
+        efectos={"tenacidad": 8},
+        slot="armadura",
+    ),
 }

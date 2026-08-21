@@ -18,6 +18,8 @@ from eter_core.engine import EterEngine
 from eter_core.systems.economic_system import EconomicSystem
 from eter_core.systems.combat_system import CombatSystem
 from eter_core.systems.item_system import ItemSystem
+from eter_core.systems.merchant_system import MerchantSystem
+from eter_core.systems.smith_system import SmithSystem
 from eter_core.systems.spawn_system import SpawnSystem
 from eter_infrastructure.messaging.event_bus import EventBus
 from eter_infrastructure.persistence.azgaar_loader import AzgaarTranslator
@@ -128,7 +130,7 @@ def _mostrar_estado_jugador(engine: EterEngine, player: PlayerComponent, ciclo: 
     print(f"HIJO DE LA LUZ | Turno {ciclo} | {_nombre_actual(engine, player)} ({engine.province_state_names[territory.azgaar_id]})")
     print(f"Arquetipo: {arquetipo.nombre} | Marca de la Estrella: {player.marca_de_la_estrella}")
     print(f"HP {player.vida}/{player.vida_maxima} | Mana {player.mana}/{player.mana_maximo} | Estamina {player.estamina}/{player.estamina_maxima}")
-    print(f"Hambre {player.hambre}/100 | Critico +{player.bonus_critico * 100:.0f}%")
+    print(f"Hambre {player.hambre}/100 | Critico +{player.bonus_critico * 100:.0f}% | Oro {player.oro:.1f}")
     print(f"Fuerza {player.fuerza}(+{bonos.get('fuerza', 0):.0f}) | Inteligencia {player.inteligencia}(+{bonos.get('inteligencia', 0):.0f}) | Tenacidad {player.tenacidad}(+{bonos.get('tenacidad', 0):.0f})")
     inventario = ', '.join(f"{item} x{cantidad}" for item, cantidad in player.inventario.items()) or "vacio"
     print(f"Inventario: {inventario}")
@@ -255,6 +257,7 @@ def iniciar_simulacion() -> None:
 
     player_entity = engine.crear_entidad()
     player = SpawnSystem.crear_jugador(engine.map_raw, province_entities, arquetipo=arquetipo_elegido)
+    player.oro = fondos_jugador
     engine.agregar_componente(player_entity, player)
 
     arquetipo = CATALOGO_ARQUETIPOS[player.potencial_nacimiento]
@@ -314,8 +317,37 @@ def iniciar_simulacion() -> None:
                 print("Objeto no valido. Escribe 'objeto ver' para ver tu inventario.")
         elif comando in ("4", "pasar"):
             print("Pasas el turno. El mundo continua su marcha.")
-        elif comando == "estado":
-            print(f"Fondos de la expedicion: {fondos_jugador:.1f}")
+        elif comando.startswith("vender "):
+            args = comando.removeprefix("vender ").strip().split()
+            cantidad = 1
+            if args and args[-1].isdigit():
+                cantidad = int(args[-1])
+                args = args[:-1]
+            producto = " ".join(args)
+            mensaje = MerchantSystem.vender(player, producto, cantidad)
+            print(mensaje if mensaje else "No puedes vender eso (no lo tienes o producto inválido).")
+            continue
+        elif comando.startswith("comprar "):
+            args = comando.removeprefix("comprar ").strip().split()
+            cantidad = 1
+            if args and args[-1].isdigit():
+                cantidad = int(args[-1])
+                args = args[:-1]
+            producto = " ".join(args)
+            mensaje = MerchantSystem.comprar(player, producto, cantidad)
+            print(mensaje if mensaje else "No puedes comprar eso (oro insuficiente o producto inválido).")
+            continue
+        elif comando == "forjar":
+            print("Recetas disponibles:")
+            for receta in SmithSystem.recetas_disponibles():
+                materiales = ', '.join(f"{m} x{c}" for m, c in receta.materiales.items())
+                disponible = "✓" if SmithSystem.puede_forjar(player, receta.resultado) else "✗"
+                print(f"  [{receta.resultado}] {receta.nombre} — {materiales} + {receta.coste_oro:.0f} oro {disponible}")
+            continue
+        elif comando.startswith("forjar "):
+            receta = comando.removeprefix("forjar ").strip()
+            mensaje = SmithSystem.forjar(player, receta)
+            print(mensaje if mensaje else "No puedes forjar eso (materiales u oro insuficientes, o receta inexistente).")
             continue
         elif comando.startswith("inspeccionar "):
             entity_id = _resolver_provincia(engine, comando.removeprefix("inspeccionar "))
@@ -326,11 +358,11 @@ def iniciar_simulacion() -> None:
             continue
         elif comando.startswith("invertir "):
             entity_id = _resolver_provincia(engine, comando.removeprefix("invertir "))
-            if entity_id is None or fondos_jugador < EconomicSystem.COSTE_INVERSION:
+            if entity_id is None or player.oro < EconomicSystem.COSTE_INVERSION:
                 print("Provincia no encontrada o fondos insuficientes.")
                 continue
             economy = engine.componentes[EconomyComponent][entity_id]
-            fondos_jugador -= EconomicSystem.COSTE_INVERSION
+            player.oro -= EconomicSystem.COSTE_INVERSION
             EconomicSystem.invertir(engine.componentes[RegiónComponent][entity_id], economy, entity_id)
             print("Inversion realizada.")
             continue
