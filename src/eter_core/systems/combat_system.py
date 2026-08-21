@@ -7,6 +7,7 @@ from eter_core.domain.events import CombateResueltoEvent
 from eter_core.domain.monsters import CATALOGO_MONSTRUOS, MonstruoDef
 from eter_core.systems.hunger_system import HungerSystem
 from eter_core.systems.item_system import ItemSystem
+from eter_core.systems.set_system import SetSystem
 from eter_infrastructure.messaging.event_bus import EventBus
 
 
@@ -39,10 +40,17 @@ class CombatSystem:
     def daño_jugador(cls, player: PlayerComponent, rng: random.Random) -> int:
         """Calcula el daño de un golpe del jugador (con crítico y penalización de hambre)."""
         bonos = ItemSystem.bonos_equipados(player)
+        bonos_set = SetSystem.bonus_sets(player)
         penalizaciones = HungerSystem.penalizaciones(player)
-        fuerza = player.fuerza + bonos.get("fuerza", 0.0) + penalizaciones.get("fuerza", 0.0)
+        fuerza = (
+            player.fuerza
+            + bonos.get("fuerza", 0.0)
+            + bonos_set.get("fuerza", 0.0)
+            + penalizaciones.get("fuerza", 0.0)
+        )
         daño = max(1, int(fuerza))
-        if rng.random() < player.bonus_critico:
+        critico = player.bonus_critico + bonos_set.get("bonus_critico", 0.0)
+        if rng.random() < critico:
             daño = int(daño * cls.MULTIPLICADOR_CRITICO)
         return daño
 
@@ -50,7 +58,12 @@ class CombatSystem:
     def daño_monstruo(cls, monstruo: MonstruoDef, player: PlayerComponent) -> int:
         """Calcula el daño que el monstruo inflige, mitigado por la tenacidad."""
         penalizaciones = HungerSystem.penalizaciones(player)
-        tenacidad = player.tenacidad + penalizaciones.get("tenacidad", 0.0)
+        bonos_set = SetSystem.bonus_sets(player)
+        tenacidad = (
+            player.tenacidad
+            + bonos_set.get("tenacidad", 0.0)
+            + penalizaciones.get("tenacidad", 0.0)
+        )
         mitigacion = max(0.0, tenacidad) * cls.MITIGACION_TENACIDAD
         return max(1, int(monstruo.ataque - mitigacion))
 

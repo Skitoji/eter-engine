@@ -1,6 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Dict, List
 
+from eter_core.domain.armor_sets import CATALOGO_SETS
+from eter_core.domain.items import CATALOGO_OBJETOS
+
 
 @dataclass(frozen=True)
 class Receta:
@@ -55,3 +58,26 @@ RECETAS_HERRERIA: Dict[str, Receta] = {
 
 def listar_recetas() -> List[Receta]:
     return list(RECETAS_HERRERIA.values())
+
+
+# Material base según el nivel del set.
+_MATERIAL_POR_NIVEL = {"basico": "hierro", "medio": "hierro_runico", "avanzado": "mithril"}
+_COSTE_POR_NIVEL = {"basico": 15.0, "medio": 60.0, "avanzado": 300.0}
+
+
+def _registrar_recetas_sets() -> None:
+    """Genera una receta de forja por cada pieza de set."""
+    for clave, set_def in CATALOGO_SETS.items():
+        material = _MATERIAL_POR_NIVEL[set_def.nivel]
+        coste = _COSTE_POR_NIVEL[set_def.nivel]
+        for pieza in set_def.piezas:
+            item = CATALOGO_OBJETOS[pieza]
+            RECETAS_HERRERIA[pieza] = Receta(
+                nombre=item.nombre,
+                resultado=pieza,
+                materiales={material: 2},
+                coste_oro=coste,
+            )
+
+
+_registrar_recetas_sets()

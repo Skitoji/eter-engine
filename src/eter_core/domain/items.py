@@ -26,6 +26,7 @@ class ItemDef:
     efectos: Dict[str, float] = field(default_factory=dict)
     slot: Optional[str] = None
     peso: float = 0.0
+    conjunto: Optional[str] = None  # id del set al que pertenece (si es pieza de set)
 
 
 # Catálogo central de objetos. Añadir un objeto nuevo es tan simple como

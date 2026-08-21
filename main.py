@@ -22,6 +22,7 @@ from eter_core.systems.item_system import ItemSystem
 from eter_core.systems.merchant_system import MerchantSystem
 from eter_core.systems.progression_system import ProgressionSystem
 from eter_core.systems.random_event_system import RandomEventSystem
+from eter_core.systems.set_system import SetSystem
 from eter_core.systems.smith_system import SmithSystem
 from eter_core.systems.spawn_system import SpawnSystem
 from eter_core.systems.spell_system import SpellSystem
@@ -143,12 +144,17 @@ def _mostrar_estado_jugador(engine: EterEngine, player: PlayerComponent, ciclo: 
         print(f"Hechizos activos: {buffs}")
     print(f"Carga {WeightSystem.peso_total(player):.1f}/{WeightSystem.capacidad_maxima(player):.0f} kg" + (" ⚠️ SOBRECARGADO" if WeightSystem.esta_sobrecargado(player) else ""))
     print(f"Fuerza {player.fuerza}(+{bonos.get('fuerza', 0):.0f}) | Inteligencia {player.inteligencia}(+{bonos.get('inteligencia', 0):.0f}) | Tenacidad {player.tenacidad}(+{bonos.get('tenacidad', 0):.0f})")
-    inventario = ', '.join(f"{item} x{cantidad}" for item, cantidad in player.inventario.items()) or "vacio"
+    inventario = ', '.join(f"{ItemSystem.definicion(item).nombre} x{cantidad}" for item, cantidad in player.inventario.items()) or "vacio"
     print(f"Inventario: {inventario}")
     materiales = ', '.join(f"{mat} x{cantidad}" for mat, cantidad in player.materiales.items()) or "ninguno"
     print(f"Materiales: {materiales}")
-    equipado = ', '.join(f"{slot}: {objeto}" for slot, objeto in player.equipamiento.items()) or "ninguno"
+    equipado = ', '.join(f"{slot}: {ItemSystem.definicion(objeto).nombre}" for slot, objeto in player.equipamiento.items()) or "ninguno"
     print(f"Equipado: {equipado}")
+    sets = SetSystem.sets_completos(player)
+    if sets:
+        for clave, set_def in sets.items():
+            bonus = ', '.join(f"{k} +{v:g}" for k, v in set_def.bonus_set.items())
+            print(f"  ✨ SET COMPLETO: {set_def.nombre} → {bonus}")
     print("=" * 60)
 
 
@@ -249,7 +255,8 @@ def _explorar(engine: EterEngine, player: PlayerComponent) -> None:
         return
     player.estamina -= 15
     _contexto_local(engine, player)
-    if player.consumir("raciones") and random.random() < 0.5:
+    if player.tiene("raciones") and random.random() < 0.5:
+        player.consumir("raciones")
         print("Exploras la zona y consumes una racion. Encuentras rastros de actividad demoniaca.")
     else:
         player.mana = min(player.mana_maximo, player.mana + 5)
