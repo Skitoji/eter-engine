@@ -80,10 +80,10 @@ La separación entre `eter_core`, `eter_infrastructure` y el bus de eventos perm
 
 ## 4. Estado Actual del Desarrollo (Fase 1)
 Se ha configurado el núcleo del motor (`eter-engine`) en Python con tipado estricto, estructurado en las siguientes capas:
-1.  **Dominio (`eter_core/domain`):** Tipos inmutables, eventos del mundo y catálogos de datos (arquetipos, productos, monstruos, objetos, recetas).
-2.  **Componentes (`eter_core/components`):** Datos regionales (población, facción, fe, infección), economía, comercio, enemigos y estado del jugador.
-3.  **Sistemas (`eter_core/systems`):** Fe, infección, economía, cultistas, spawn de monstruos, combate, objetos, mercader, herrero, precios, peso y hambre.
-4.  **Infraestructura (`eter_infrastructure`):** `EventBus` para comunicación entre mecánicas.
+1.  **Dominio (`eter_core/domain`):** Tipos inmutables, eventos del mundo y catálogos de datos (arquetipos, productos, monstruos, objetos, recetas, hechizos, sets, NPCs).
+2.  **Componentes (`eter_core/components`):** Datos regionales (población, facción, fe, infección), economía, comercio, enemigos, stock y estado del jugador.
+3.  **Sistemas (`eter_core/systems`):** 21 sistemas que cubren toda la simulación.
+4.  **Infraestructura (`eter_infrastructure`):** `EventBus` y persistencia (`SaveSystem`).
 5.  **Importación de mundo (`eter_infrastructure/persistence`):** `AzgaarTranslator` traduce la exportación real de Azgaar (`pack.states`, `pack.provinces` y `pack.cells`) a estados y regiones normalizadas.
 6.  **Escala territorial:** El mapa actual aporta 18 estados soberanos, 252 provincias simulables y 5.709 celdas terrestres.
 
@@ -94,10 +94,13 @@ El mundo es 100% data-driven: nada se hardcodea en los sistemas.
   * Tanque / Coloso (alta vida y tenacidad), Mago / Erudito (alto maná e inteligencia), Caballero / Vanguardia (balanceado), Asesino / Acechador (alta estamina y +25% crítico).
 * **`products.py`**: metales (hierro → hierro rúnico → mithril), subproductos de monstruos y alimentos. Cada producto tiene rareza, valor base, dificultad, geografía nativa y peso.
 * **`monsters.py`**: bestiario de 15 criaturas por tiers 1-5, con drops que referencian productos válidos.
-* **`items.py`**: objetos consumibles, herramientas y equipables (con slot y peso).
-* **`recipes.py`**: 6 recetas de herrería que transforman materiales + oro en equipo.
+* **`items.py`**: objetos consumibles, herramientas y equipables (con slot, peso y conjunto).
+* **`recipes.py`**: recetas de herrería (incluye las 36 piezas de set generadas automáticamente).
+* **`spells.py`**: 6 hechizos (buff, curación, área, daño).
+* **`armor_sets.py`**: 12 sets de ropa (4 clases × 3 niveles), 36 piezas.
+* **`npcs.py`**: 6 NPCs amistosos.
 
-### 4.2. Sistemas Implementados
+### 4.2. Sistemas Implementados (21)
 | Sistema | Función |
 |---|---|
 | `FaithSystem` | El fervor baja con la infección; calcula la tasa de magos oscuros |
@@ -113,19 +116,27 @@ El mundo es 100% data-driven: nada se hardcodea en los sistemas.
 | `WeightSystem` | Peso, capacidad de carga y sobrecarga |
 | `HungerSystem` | Hambre por día con penalizaciones según arquetipo |
 | `SpawnSystem` | Creación del jugador con arquetipo elegible |
+| `SpellSystem` | Lanza hechizos consumiendo maná (buffs temporales) |
+| `ProgressionSystem` | XP y subida de nivel |
+| `TravelSystem` | Distancias y coste de viaje (fronteras) |
+| `RandomEventSystem` | Eventos aleatorios de baja probabilidad |
+| `SetSystem` | Detección de sets completos y buffs |
+| `NpcSystem` | Interacción con el pueblo (posadero, cura, capitán...) |
+| `StockSystem` | Oferta/demanda fluctuante por provincia |
+| `SaveSystem` | Persistencia (guardar/cargar partida) |
 
 ### 4.3. Bucle de Juego Completo
-El jugador ya puede vivir un ciclo económico completo:
+El jugador ya puede vivir un ciclo completo:
 
 ```
-elegir arquetipo → explorar → cazar monstruos → drops → vender materiales
-→ comprar materiales → forjar equipo → equipar → cazar mejor
+elegir arquetipo → explorar → cazar monstruos → drops → vender/forjar
+→ equipar sets → lanzar hechizos → subir nivel → interactuar con el pueblo → guardar
 ```
 
-El mundo vive **sin el jugador**: monstruos, infección, fe, economía y precios evolucionan solos cada tick.
+El mundo vive **sin el jugador**: monstruos, infección, fe, economía, precios y stock evolucionan solos cada tick.
 
 ### 4.4. Roadmap (visión de skitoji)
-Implementado:
+Completado:
 * ✅ Precios dinámicos (ubicación + oferta/demanda)
 * ✅ Sistema de peso
 * ✅ Hambre activa (ligada al día)
@@ -133,15 +144,19 @@ Implementado:
 * ✅ Productos (hierro → hierro rúnico → mithril)
 * ✅ Bestiario completo + combate + drops
 * ✅ Mercader + herrero (economía de NPCs)
+* ✅ Distancias (ciudad↔ciudad ≠ país↔país)
+* ✅ Hechizos/habilidades (invisibilidad en área, buffs con mana)
+* ✅ Eventos aleatorios de baja probabilidad
+* ✅ Sets de ropa por clase con buff al completar
+* ✅ NPCs amistosos + interacción con el pueblo
+* ✅ XP / nivel (progresión)
+* ✅ Persistencia (guardar/cargar partida)
+* ✅ Stock fluctuante de mercaderes/herreros
 
-Pendiente:
-* ⏳ Distancias (ciudad↔ciudad ≠ país↔país)
-* ⏳ Hechizos/habilidades (invisibilidad en área, buffs con mana)
-* ⏳ Eventos aleatorios de baja probabilidad
-* ⏳ Armaduras por clase (tank/arquero/mago)
-* ⏳ NPCs amistosos + interacción con el pueblo
-* ⏳ XP / nivel (progresión)
-* ⏳ Persistencia (guardar/cargar partida)
-* ⏳ Herreros/mercaderes como entidades del mundo con stock fluctuante
+Futuro:
+* ⏳ Herreros/mercaderes como entidades individuales con stock por NPC (hoy es stock por provincia)
+* ⏳ Más hechizos y habilidades
+* ⏳ Combate con múltiples enemigos / hordas
+* ⏳ Integración gráfica (2D/3D) y, a largo plazo, VR
 
 El lore original se conserva e integra sobre esta geografía. La Infección Demoníaca puede surgir en provincias fronterizas o zonas salvajes; la Santa Iglesia puede medir el fervor por provincia o por estado; y los gremios pueden reaccionar a las crisis económicas y territoriales locales.
