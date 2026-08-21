@@ -59,3 +59,22 @@ class CultistasSurgidosEvent(DomainEvent):
     region_id: EntityID
     nombre_region: str
     total_cultistas: int
+
+
+@dataclass(frozen=True)
+class MonstruoAvistadoEvent(DomainEvent):
+    """Se emite cuando un monstruo salvaje aparece en una región."""
+    region_id: EntityID
+    nombre_region: str
+    monstruo: str
+    total_monstruos: int
+
+
+@dataclass(frozen=True)
+class CombateResueltoEvent(DomainEvent):
+    """Se emite al resolverse un combate entre el jugador y un monstruo."""
+    monstruo: str
+    victoria: bool
+    daño_infligido: int
+    daño_recibido: int
+    drops: dict

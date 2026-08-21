@@ -5,9 +5,11 @@ from eter_core.components.region_component import RegiónComponent
 from eter_core.systems.faith_system import FaithSystem
 from eter_core.components.economy_component import EconomyComponent
 from eter_core.components.enemy_component import EnemyComponent
+from eter_core.components.trade_component import TradeComponent
 from eter_core.systems.economic_system import EconomicSystem
 from eter_core.systems.infection_system import InfectionSystem
 from eter_core.systems.cultist_system import CultistSystem
+from eter_core.systems.monster_spawn_system import MonsterSpawnSystem
 
 class EterEngine:
     def __init__(self):
@@ -58,5 +60,18 @@ class EterEngine:
             CultistSystem.procesar(
                 self.componentes[RegiónComponent],
                 self.componentes[EnemyComponent],
+                delta_tiempo,
+            )
+
+        # 5. Sistema de Spawn de Monstruos: fauna salvaje ligada a bioma/infección/fe
+        if (
+            RegiónComponent in self.componentes
+            and EnemyComponent in self.componentes
+            and TradeComponent in self.componentes
+        ):
+            MonsterSpawnSystem.procesar(
+                self.componentes[RegiónComponent],
+                self.componentes[EnemyComponent],
+                self.componentes[TradeComponent],
                 delta_tiempo,
             )

@@ -16,6 +16,7 @@ from eter_core.domain.events import ComercioRealizadoEvent, HegemoniaIglesiaRota
 from eter_core.domain.types import FaccionTipo, FervorReligioso, NivelInfeccion
 from eter_core.engine import EterEngine
 from eter_core.systems.economic_system import EconomicSystem
+from eter_core.systems.combat_system import CombatSystem
 from eter_core.systems.item_system import ItemSystem
 from eter_core.systems.spawn_system import SpawnSystem
 from eter_infrastructure.messaging.event_bus import EventBus
@@ -131,6 +132,8 @@ def _mostrar_estado_jugador(engine: EterEngine, player: PlayerComponent, ciclo: 
     print(f"Fuerza {player.fuerza}(+{bonos.get('fuerza', 0):.0f}) | Inteligencia {player.inteligencia}(+{bonos.get('inteligencia', 0):.0f}) | Tenacidad {player.tenacidad}(+{bonos.get('tenacidad', 0):.0f})")
     inventario = ', '.join(f"{item} x{cantidad}" for item, cantidad in player.inventario.items()) or "vacio"
     print(f"Inventario: {inventario}")
+    materiales = ', '.join(f"{mat} x{cantidad}" for mat, cantidad in player.materiales.items()) or "ninguno"
+    print(f"Materiales: {materiales}")
     equipado = ', '.join(f"{slot}: {objeto}" for slot, objeto in player.equipamiento.items()) or "ninguno"
     print(f"Equipado: {equipado}")
     print("=" * 60)
@@ -139,14 +142,45 @@ def _mostrar_estado_jugador(engine: EterEngine, player: PlayerComponent, ciclo: 
 def _mostrar_menu_local(engine: EterEngine, player: PlayerComponent) -> Dict[str, int]:
     current = _provincia_actual(engine, player)
     neighbours = sorted(engine.adyacencias.get(current, set()), key=lambda entity: engine.componentes[RegiónComponent][entity].nombre)
+    enemy = engine.componentes[EnemyComponent][current]
     print(f"Estas en {_nombre_actual(engine, player)}. Puedes:")
     print("[1] Moverte a una provincia adyacente")
     for index, entity_id in enumerate(neighbours, start=1):
         print(f"    mover {index}: {engine.componentes[RegiónComponent][entity_id].nombre}")
     print("[2] Explorar la zona")
+    if enemy.monstruos:
+        resumen = ', '.join(f"{nombre} x{cantidad}" for nombre, cantidad in enemy.monstruos.items())
+        print(f"[5] Cazar monstruo (presentes: {resumen})")
     print("[3] Usar objeto")
     print("[4] Pasar turno")
     return {str(index): entity_id for index, entity_id in enumerate(neighbours, start=1)}
+
+
+def _cazar(engine: EterEngine, player: PlayerComponent) -> None:
+    current = _provincia_actual(engine, player)
+    enemy = engine.componentes[EnemyComponent][current]
+    if not enemy.monstruos:
+        print("No hay monstruos visibles en esta provincia. Explora o espera a que aparezcan.")
+        return
+    monstruo_clave = random.choice(list(enemy.monstruos.keys()))
+    monstruo = enemy.monstruos[monstruo_clave]
+    print(f"\n⚔️  Un {monstruo_clave.title()} bloquea tu camino. Te preparas para el combate...")
+    resultado = CombatSystem.resolver(player, monstruo_clave)
+    print(f"Combate: {resultado.turnos} turnos | Daño infligido: {resultado.daño_infligido} | Daño recibido: {resultado.daño_recibido}")
+    if resultado.victoria:
+        print("🏆 ¡Victoria!")
+        if resultado.drops:
+            for producto, cantidad in resultado.drops.items():
+                print(f"  💎 Obtienes: {producto} x{cantidad}")
+        else:
+            print("  (El monstruo no dejó nada esta vez.)")
+        enemy.monstruos[monstruo_clave] -= 1
+        if enemy.monstruos[monstruo_clave] <= 0:
+            del enemy.monstruos[monstruo_clave]
+    else:
+        print("💀 Has sido derrotado...")
+    CombatSystem.aplicar_resultado(player, resultado)
+    player.estamina = max(0, player.estamina - 15)
 
 
 def _mostrar_provincia(engine: EterEngine, entity_id: int) -> None:
@@ -255,6 +289,8 @@ def iniciar_simulacion() -> None:
             _contexto_local(engine, player)
         elif comando in ("2", "explorar"):
             _explorar(engine, player)
+        elif comando in ("5", "cazar"):
+            _cazar(engine, player)
         elif comando in ("3", "objeto", "usar objeto"):
             print("Uso: objeto ver | objeto usar [nombre o numero] | objeto equipar [nombre]")
         elif comando == "objeto ver":

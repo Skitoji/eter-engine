@@ -18,6 +18,7 @@ class PlayerComponent:
     potencial_nacimiento: str = "caballero"
     hambre: int = 100          # 100 = saciado, 0 = famélico
     inventario: Dict[str, int] = field(default_factory=lambda: {"brujula": 1, "raciones": 3, "antorcha": 1})
+    materiales: Dict[str, int] = field(default_factory=dict)  # productos/drops de monstruos
     equipamiento: Dict[str, str] = field(default_factory=dict)  # slot -> clave de objeto
     objeto_equipado: Optional[str] = None
     marca_de_la_estrella: str = "pecho"
@@ -43,6 +44,13 @@ class PlayerComponent:
         if self.inventario[nombre] <= 0:
             del self.inventario[nombre]
         return True
+
+    def dar_material(self, nombre: str, cantidad: int = 1) -> None:
+        """Añade un material/producto (drop de monstruo, mineral, alimento) al inventario."""
+        self.materiales[nombre] = self.materiales.get(nombre, 0) + cantidad
+
+    def tiene_material(self, nombre: str) -> bool:
+        return self.materiales.get(nombre, 0) > 0
 
     def equipar(self, slot: str, nombre: str) -> None:
         """Equipa un objeto en un slot (arma, armadura, accesorio...)."""
