@@ -11,6 +11,8 @@ from eter_core.components.enemy_component import EnemyComponent
 from eter_core.components.player_component import PlayerComponent
 from eter_core.components.region_component import RegiónComponent, StateComponent, TerritoryComponent
 from eter_core.components.trade_component import TradeComponent
+from eter_core.components.stock_component import StockComponent
+from eter_core.domain.npcs import CATALOGO_NPCS
 from eter_core.domain.archetypes import CATALOGO_ARQUETIPOS
 from eter_core.domain.events import ComercioRealizadoEvent, HegemoniaIglesiaRotasEvent
 from eter_core.domain.types import FaccionTipo, FervorReligioso, NivelInfeccion
@@ -20,16 +22,19 @@ from eter_core.systems.combat_system import CombatSystem
 from eter_core.systems.hunger_system import HungerSystem
 from eter_core.systems.item_system import ItemSystem
 from eter_core.systems.merchant_system import MerchantSystem
+from eter_core.systems.npc_system import NpcSystem
 from eter_core.systems.progression_system import ProgressionSystem
 from eter_core.systems.random_event_system import RandomEventSystem
 from eter_core.systems.set_system import SetSystem
 from eter_core.systems.smith_system import SmithSystem
 from eter_core.systems.spawn_system import SpawnSystem
 from eter_core.systems.spell_system import SpellSystem
+from eter_core.systems.stock_system import StockSystem
 from eter_core.systems.travel_system import TravelSystem
 from eter_core.systems.weight_system import WeightSystem
 from eter_infrastructure.messaging.event_bus import EventBus
 from eter_infrastructure.persistence.azgaar_loader import AzgaarTranslator
+from eter_infrastructure.persistence.save_system import SaveSystem
 
 
 def al_romperse_hegemonia(evento: HegemoniaIglesiaRotasEvent) -> None:
@@ -84,6 +89,7 @@ def cargar_mundo() -> Tuple[EterEngine, Dict[int, int], Dict[int, int], float]:
         market.nombre_completo = data.full_name
         engine.agregar_componente(entity_id, market)
         engine.agregar_componente(entity_id, EnemyComponent())
+        engine.agregar_componente(entity_id, StockSystem.crear_stock(market.bioma))
         province_names[data.name.casefold()] = entity_id
         province_names[f"{data.name} {province_id}".casefold()] = entity_id
         province_state_names[province_id] = state_name
@@ -162,17 +168,89 @@ def _mostrar_menu_local(engine: EterEngine, player: PlayerComponent) -> Dict[str
     current = _provincia_actual(engine, player)
     neighbours = sorted(engine.adyacencias.get(current, set()), key=lambda entity: engine.componentes[RegiónComponent][entity].nombre)
     enemy = engine.componentes[EnemyComponent][current]
+    market = engine.componentes[TradeComponent][current]
     print(f"Estas en {_nombre_actual(engine, player)}. Puedes:")
-    print("[1] Moverte a una provincia adyacente")
+    print("  [1] Moverte a una provincia adyacente")
     for index, entity_id in enumerate(neighbours, start=1):
-        print(f"    mover {index}: {engine.componentes[RegiónComponent][entity_id].nombre}")
-    print("[2] Explorar la zona")
+        print(f"      mover {index}: {engine.componentes[RegiónComponent][entity_id].nombre}")
+    print("  [2] Explorar la zona")
     if enemy.monstruos:
         resumen = ', '.join(f"{nombre} x{cantidad}" for nombre, cantidad in enemy.monstruos.items())
-        print(f"[5] Cazar monstruo (presentes: {resumen})")
-    print("[3] Usar objeto")
-    print("[4] Pasar turno")
+        print(f"  [5] Cazar monstruo (presentes: {resumen})")
+    print("  [3] Objeto | [4] Pasar turno")
+    # NPCs disponibles en la ubicación
+    from eter_core.domain.npcs import npcs_por_ubicacion
+    npcs = npcs_por_ubicacion(market.tiene_ciudad)
+    nombres_npc = ', '.join(CATALOGO_NPCS[rol].nombre for rol in npcs if rol in CATALOGO_NPCS)
+    print(f"  [pueblo] Interactuar con la gente ({nombres_npc})")
     return {str(index): entity_id for index, entity_id in enumerate(neighbours, start=1)}
+
+
+def _interactuar_pueblo(engine: EterEngine, player: PlayerComponent) -> None:
+    current = _provincia_actual(engine, player)
+    market = engine.componentes[TradeComponent][current]
+    region = engine.componentes[RegiónComponent][current]
+    enemy = engine.componentes[EnemyComponent][current]
+    from eter_core.domain.npcs import CATALOGO_NPCS, npcs_por_ubicacion
+
+    npcs = npcs_por_ubicacion(market.tiene_ciudad)
+    print("\nGente disponible:")
+    for index, rol in enumerate(npcs, start=1):
+        if rol in CATALOGO_NPCS:
+            npc = CATALOGO_NPCS[rol]
+            print(f"  [{index}] {npc.nombre} — {npc.descripcion}")
+    print("  [0] Volver")
+    eleccion = input("Con quién hablas? > ").strip()
+    if not eleccion.isdigit():
+        return
+    idx = int(eleccion)
+    if idx == 0 or idx > len(npcs):
+        return
+    rol = npcs[idx - 1]
+    npc = CATALOGO_NPCS[rol]
+    print(f"\n{npc.nombre}: \"{npc.saludo}\"")
+
+    if rol == "posadero":
+        mensaje = NpcSystem.descansar(player)
+        print(mensaje if mensaje else "No tienes suficiente oro para descansar.")
+    elif rol == "cura":
+        mensaje = NpcSystem.curar(player)
+        print(mensaje if mensaje else "No tienes suficiente oro para curarte.")
+    elif rol == "aldeano":
+        print(f"  Rumor: {NpcSystem.rumor(region.infeccion.valor, region.fervor.valor)}")
+    elif rol == "capitan":
+        print(f"  {NpcSystem.informe_capitan(region.infeccion.valor, enemy.monstruos)}")
+    elif rol == "mercader":
+        print("  Puedes usar 'comprar <producto>' o 'vender <producto>' para comerciar.")
+    elif rol == "herrero":
+        print("  Usa 'forjar' para ver las recetas disponibles.")
+
+
+def _mostrar_ayuda() -> None:
+    print("\n" + "=" * 60)
+    print("COMANDOS DISPONIBLES")
+    print("=" * 60)
+    print("  mover <n>            Viajar a una provincia adyacente")
+    print("  explorar             Explorar la zona actual")
+    print("  cazar                Combatir monstruos presentes")
+    print("  objeto ver           Ver inventario")
+    print("  objeto usar <n>      Usar un objeto (por nombre o número)")
+    print("  objeto equipar <n>   Equipar un objeto")
+    print("  objeto desequipar <slot>  Quitar equipo")
+    print("  hechizos             Listar hechizos")
+    print("  hechizo <nombre>     Lanzar un hechizo")
+    print("  pueblo               Interactuar con la gente")
+    print("  comprar <producto>   Comprar al mercader")
+    print("  vender <producto>    Vender al mercader")
+    print("  forjar               Ver recetas del herrero")
+    print("  forjar <receta>      Forjar un objeto")
+    print("  inspeccionar <prov>  Ver datos de una provincia")
+    print("  invertir <prov>      Invertir en una provincia")
+    print("  guardar              Guardar la partida")
+    print("  cargar               Cargar la partida guardada")
+    print("  pasar                Pasar el turno")
+    print("  salir                Abandonar la simulación")
+    print("=" * 60)
 
 
 def _bioma_actual(engine: EterEngine, player: PlayerComponent) -> str:
@@ -297,11 +375,26 @@ def iniciar_simulacion() -> None:
     while player.esta_vivo():
         _mostrar_estado_jugador(engine, player, ciclo)
         movimiento = _mostrar_menu_local(engine, player)
-        comando = input("\nAccion [1-4, mover N, explorar, objeto, pasar, ayuda, salir] > ").strip().casefold()
+        comando = input("\nAccion [ayuda para ver comandos] > ").strip().casefold()
         if comando == "salir":
             print("Abandonaste a Eter a su suerte. Fin de la simulacion.")
             return
-        if comando in ("ayuda", "menu"):
+        if comando in ("ayuda", "menu", "?"):
+            _mostrar_ayuda()
+            continue
+        if comando == "pueblo":
+            _interactuar_pueblo(engine, player)
+            continue
+        if comando == "guardar":
+            ruta = SaveSystem.guardar(player)
+            print(f"Partida guardada en {ruta}.")
+            continue
+        if comando == "cargar":
+            if not SaveSystem.existe_partida():
+                print("No hay partida guardada.")
+            else:
+                SaveSystem.aplicar(player, SaveSystem.cargar())
+                print("Partida cargada.")
             continue
         if comando in ("1", "mover"):
             print("Elige un indice de vecino, por ejemplo: mover 1.")
@@ -377,8 +470,17 @@ def iniciar_simulacion() -> None:
                 args = args[:-1]
             producto = " ".join(args)
             bioma = _bioma_actual(engine, player)
-            mensaje = MerchantSystem.vender(player, producto, cantidad, bioma=bioma)
-            print(mensaje if mensaje else "No puedes vender eso (no lo tienes o producto inválido).")
+            stock = engine.componentes[StockComponent][_provincia_actual(engine, player)]
+            mensaje = MerchantSystem.vender(
+                player, producto, cantidad, bioma=bioma,
+                oferta=stock.oferta.get(producto, 100.0),
+                demanda=stock.demanda.get(producto, 50.0),
+            )
+            if mensaje:
+                StockSystem.registrar_venta(stock, producto, cantidad)
+                print(mensaje)
+            else:
+                print("No puedes vender eso (no lo tienes o producto inválido).")
             continue
         elif comando.startswith("comprar "):
             args = comando.removeprefix("comprar ").strip().split()
@@ -388,8 +490,17 @@ def iniciar_simulacion() -> None:
                 args = args[:-1]
             producto = " ".join(args)
             bioma = _bioma_actual(engine, player)
-            mensaje = MerchantSystem.comprar(player, producto, cantidad, bioma=bioma)
-            print(mensaje if mensaje else "No puedes comprar eso (oro insuficiente o producto inválido).")
+            stock = engine.componentes[StockComponent][_provincia_actual(engine, player)]
+            mensaje = MerchantSystem.comprar(
+                player, producto, cantidad, bioma=bioma,
+                oferta=stock.oferta.get(producto, 100.0),
+                demanda=stock.demanda.get(producto, 50.0),
+            )
+            if mensaje:
+                StockSystem.registrar_compra(stock, producto, cantidad)
+                print(mensaje)
+            else:
+                print("No puedes comprar eso (oro insuficiente o producto inválido).")
             continue
         elif comando == "forjar":
             print("Recetas disponibles:")

@@ -28,3 +28,7 @@ htmlcov/
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Partidas guardadas
+save.json
+*.save.json

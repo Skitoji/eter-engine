@@ -6,10 +6,12 @@ from eter_core.systems.faith_system import FaithSystem
 from eter_core.components.economy_component import EconomyComponent
 from eter_core.components.enemy_component import EnemyComponent
 from eter_core.components.trade_component import TradeComponent
+from eter_core.components.stock_component import StockComponent
 from eter_core.systems.economic_system import EconomicSystem
 from eter_core.systems.infection_system import InfectionSystem
 from eter_core.systems.cultist_system import CultistSystem
 from eter_core.systems.monster_spawn_system import MonsterSpawnSystem
+from eter_core.systems.stock_system import StockSystem
 
 class EterEngine:
     def __init__(self):
@@ -75,3 +77,8 @@ class EterEngine:
                 self.componentes[TradeComponent],
                 delta_tiempo,
             )
+
+        # 6. Sistema de Stock: la oferta/demanda del mercado fluctúa
+        if StockComponent in self.componentes:
+            for stock in self.componentes[StockComponent].values():
+                StockSystem.fluctuar(stock)
