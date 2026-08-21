@@ -20,6 +20,7 @@ class PlayerComponent:
     marca_de_la_estrella: str = "pecho"
     celda_actual: int = 0
     provincia_actual: int = 0
+    ayuda_recibida: set[int] = field(default_factory=set)
 
     def esta_vivo(self) -> bool:
         return self.vida > 0
@@ -45,3 +46,18 @@ class PlayerComponent:
             return False
         self.objeto_equipado = nombre
         return True
+
+    def aplicar_efectos(self, efectos: Dict[str, float]) -> None:
+        """Aplica modificadores de stats, sin superar los máximos."""
+        if "vida" in efectos:
+            self.vida = min(self.vida_maxima, self.vida + efectos["vida"])
+        if "mana" in efectos:
+            self.mana = min(self.mana_maximo, self.mana + efectos["mana"])
+        if "estamina" in efectos:
+            self.estamina = min(self.estamina_maxima, self.estamina + efectos["estamina"])
+        if "fuerza" in efectos:
+            self.fuerza += efectos["fuerza"]
+        if "inteligencia" in efectos:
+            self.inteligencia += efectos["inteligencia"]
+        if "tenacidad" in efectos:
+            self.tenacidad += efectos["tenacidad"]

@@ -15,6 +15,7 @@ from eter_core.domain.events import ComercioRealizadoEvent, HegemoniaIglesiaRota
 from eter_core.domain.types import FaccionTipo, FervorReligioso, NivelInfeccion
 from eter_core.engine import EterEngine
 from eter_core.systems.economic_system import EconomicSystem
+from eter_core.systems.item_system import ItemSystem
 from eter_core.systems.spawn_system import SpawnSystem
 from eter_infrastructure.messaging.event_bus import EventBus
 from eter_infrastructure.persistence.azgaar_loader import AzgaarTranslator
@@ -158,6 +159,7 @@ def _contexto_local(engine: EterEngine, player: PlayerComponent) -> None:
     entity_id = _provincia_actual(engine, player)
     region = engine.componentes[RegiónComponent][entity_id]
     market = engine.componentes[TradeComponent][entity_id]
+    territory = engine.componentes[TerritoryComponent][entity_id]
     if market.tiene_ciudad:
         print(f"La ciudad de {region.nombre} mantiene sus mercados abiertos pese a la crisis.")
     elif region.infeccion.valor > 0.45:
@@ -166,8 +168,13 @@ def _contexto_local(engine: EterEngine, player: PlayerComponent) -> None:
         print(f"El entorno es de {market.bioma}; los lugarenos hablan de {', '.join(market.productos[:2])}.")
     if region.fervor.valor < 0.35:
         print("Los aldeanos desconfian de tu Marca de la Estrella y vigilan tus movimientos.")
+    elif territory.azgaar_id not in player.ayuda_recibida:
+        # La aldeana entrega hierbas reales al inventario, una sola vez por provincia.
+        player.ayuda_recibida.add(territory.azgaar_id)
+        ItemSystem.dar_objeto(player, "hierbas", 1)
+        print("Una aldeana reconoce tu Marca de la Estrella y te da hierbas curativas. (+1 hierbas)")
     else:
-        print("Una aldeana reconoce tu Marca de la Estrella y ofrece hierbas curativas.")
+        print("Los aldeanos reconocen tu Marca de la Estrella y te saludan con respeto.")
 
 
 def _explorar(engine: EterEngine, player: PlayerComponent) -> None:
@@ -183,17 +190,12 @@ def _explorar(engine: EterEngine, player: PlayerComponent) -> None:
         print("Exploras la zona y encuentras un santuario olvidado. Recuperas 5 de mana.")
 
 
-def _usar_objeto(player: PlayerComponent) -> None:
-    if player.tiene("raciones") and player.vida < player.vida_maxima:
-        player.consumir("raciones")
-        player.vida = min(player.vida_maxima, player.vida + 20)
-        print("Usas una racion y recuperas 20 HP.")
-    elif player.tiene("antorcha"):
-        player.consumir("antorcha")
-        player.estamina = min(player.estamina_maxima, player.estamina + 10)
-        print("Enciendes la antorcha y recuperas 10 de estamina.")
+def _usar_objeto(player: PlayerComponent, nombre_objeto: str) -> None:
+    mensaje = ItemSystem.usar_objeto(player, nombre_objeto)
+    if mensaje is None:
+        print("No puedes usar ese objeto ahora (no lo tienes, no existe, o tu stat ya esta al maximo).")
     else:
-        print("No tienes un objeto util ahora mismo.")
+        print(f"Usas {nombre_objeto}. {mensaje}")
 
 
 def iniciar_simulacion() -> None:
@@ -248,14 +250,10 @@ def iniciar_simulacion() -> None:
             if nombre_objeto.isdigit():
                 nombres = list(player.inventario)
                 nombre_objeto = nombres[int(nombre_objeto) - 1] if 0 < int(nombre_objeto) <= len(nombres) else ""
-            if nombre_objeto == "raciones" and player.vida < player.vida_maxima:
-                _usar_objeto(player)
-            elif nombre_objeto == "antorcha":
-                _usar_objeto(player)
-            elif nombre_objeto == "brujula":
-                print("La brujula revela tus rutas adyacentes.")
+            if nombre_objeto:
+                _usar_objeto(player, nombre_objeto)
             else:
-                print("No puedes usar ese objeto ahora.")
+                print("Objeto no valido. Escribe 'objeto ver' para ver tu inventario.")
         elif comando in ("4", "pasar"):
             print("Pasas el turno. El mundo continua su marcha.")
         elif comando == "estado":
